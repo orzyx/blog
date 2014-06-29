@@ -1,7 +1,7 @@
 # Require any additional compass plugins here.
 
 # Set this to the root of your project when deployed:
-http_path = "blog"
+http_path = "/blog/"
 css_dir = "css"
 sass_dir = "_sass"
 images_dir = "images"
