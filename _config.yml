@@ -2,4 +2,4 @@ permalink: pretty
 paginate: 10
 exclude: ['Rakefile', 'Gemfile', 'Gemfile.lock', 'config.rb', 'run']
 
-production_url: http://orzyx.github.com
+production_url: http://orzyx.github.com/blog
