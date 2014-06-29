@@ -1,0 +1,153 @@
+---
+layout: post
+title: "An Introduction to Cubism"
+tags: [cubism, javascript]
+image:
+  feature: abstract-10.jpg
+  credit: dargadgetz
+  creditlink: http://www.dargadgetz.com/ios-7-abstract-wallpaper-pack-for-iphone-5-and-ipod-touch-retina/
+comments: true
+share: true
+---
+
+After watching Mike Bostock's mind-blowing [presentation](http://vimeo.com/42176902), I decided to write my first Cubism program. 
+It was a disaster. It took me a week of frustration to create a basic graph due to the hours spent understanding each parameter. This tutorial was created for the express purpose of reducing this pain.
+
+Before we begin
+---
+If you're not comfortable with HTML, CSS and JavaScript, I'd recommend that you brush up your skills and come back. [D3](http://d3js.org/) knowledge is helpful, but not necessary. This tutorial does involve vintners and distillers, so you might want to stick around.
+
+Setup
+---
+Download this accompanying [ repository ](https://github.com/xaranke/cubism-intro). Navigate to the directory and start a simple web-server there using the `python3 -m http.server` command. Check that everything's alright by going to the [ test page ](http://localhost:8000/01.html).
+
+You're now ready to kick some Cubism ass!
+
+Building blocks
+---
+We now need a time series. Since I don't have radiation logs of a nuclear reactor, we're going to have to make do with Google's minute-by-minute stock data. 
+
+As a sample, I've created the data for a few vintners. Check it out in the *data* folder.
+You can also add your own stocks using the `python3 fetcher.py <your_stock>` script.
+Now we'll create a context to keep track of the step and size.
+
+{% highlight javascript %}
+var context = cubism.context()
+                    .step(6e4) // Distance between data points in milliseconds
+                    .size(400) // Number of data points
+                    .stop();   // Fetching from a static data source; don't update values
+{% endhighlight %} 
+
+Horizon charts represent a delta; let's make ours show change in prices relative to the start of the day.
+ 
+{% highlight javascript %}
+function stock(name) { 
+	return context.metric(function(start, stop, step, callback) {
+	    d3.json("/data" + name + ".json", function(rows) {
+	        var compare = rows[0][1], value = rows[0][1], values = [value];
+	        
+	        // Creates an array of the price differences throughout the day
+	        rows.forEach(function(d) {
+	            values.push(value = (d[1] - compare) / compare);
+	    	}); 
+		callback(null, values); }); 
+	}, name); 
+}
+{% endhighlight %} 
+
+Now we just need to plot the data, create the axes and a rule.
+
+{% highlight javascript %}
+function draw_graph(stocks_list) {
+	d3.select("body").append("div") // Add a vertical rule to the graph
+          .attr("class", "rule") 
+          .call(context.rule());
+
+    d3.select("#demo")                 // Select the div on which we want to act           
+      .selectAll(".axis")              // This is a standard D3 mechanism to bind data
+      .data(["top"])                   // to a graph. In this case we're binding the axes
+      .enter()                         // "top" and "bottom". Create two divs and give them
+      .append("div")                   // the classes top axis and bottom axis respectively. 
+      .attr("class", function(d) {      
+      	return d + " axis";           
+      })                             
+      .each(function(d) {              // For each of these axes, draw the axes with 4 
+      	d3.select(this)              // intervals and place them in their proper places.
+      	  .call(context.axis()       // 4 ticks gives us an hourly axis.
+      	  .ticks(4).orient(d));      
+      });                            
+
+    d3.select("#demo")                 
+      .selectAll(".horizon")           
+      .data(stocks_list.map(stock))    
+      .enter()                         
+      .insert("div", ".bottom")        // Insert the graph in a div. Turn the div into  
+      .attr("class", "horizon")        // a horizon graph and format to 2 decimals places.
+      .call(context.horizon()
+      .format(d3.format("+,.2p")));  
+
+    context.on("focus", function(i) {
+        d3.selectAll(".value").style("right",   // Make the rule coincide with the mouse 
+        	i == null ? null : context.size() - i + "px");
+    });
+} 
+{% endhighlight %} 
+
+Congratulations, check out your [first Cubism app](http://localhost:8000/02.html)!
+<figure>
+  <img src="/images/cubism-intro-1.png">
+</figure>
+
+"Gee, that's nice!" you say, but on closer inspection you notice two problems. Let's tackle them one at a time.
+
+The business hours are wrong
+---
+
+The NYSE opens at 9:30 AM and closes at 4 PM, not 1 PM and 7 PM like our graph says. Clearly something's amiss. Well, here's the scoop: Cubism is built for real-time data, so it thinks the latest data happened **now**. Not to worry! We can fix this by using a suitable offset like this:
+
+{% highlight javascript %}
+var current_date = new Date();                                                     
+
+// You can use this formula to calculate the offset:
+// Number of minutes elapsed today - Time your data ends in minutes(in this case 960) + 10
+var offset_mins = ((60*current_date.getHours()) + current_date.getMinutes()) - 970;
+
+// Don't forget to convert this to milliseconds!
+var offset_millis = offset_mins * 60 * 1000;   
+{% endhighlight %} 
+
+Now we just need to add `serverDelay(offset_millis)` to our `context`. Check out the next iteration [here](http://localhost:8000/03.html).
+
+<figure>
+  <img src="/images/cubism-intro-2.png">
+</figure>
+
+
+The graphs end at different times
+---
+
+Vintners' stocks don't get traded for certain times during the day and hence our *JSON* data does not contain the prices for these times. Our JSON parser (sadly not context aware) treats this data as if it were continuous, and so goes on filling in values from left to right. Near the end, it runs out of values and this is the reason for the ugly white patches.
+
+To fix this, we need to make our data continuous. One way to do this would be to *front-fill* the data or create data points every minute whose value is the last available price.
+
+Since there was no readily available solution, I created [*missing-data.js*](https://github.com/xaranke/missing-data), a Javascript library that does all this manipulation for you. Now include *missing-data* and its dependency [*underscore.js*](http://underscorejs.org/). We now need to modify our `stock` function.
+
+{% highlight javascript %}
+d3.json("data/" + name + ".json", function(original_rows) {
+  // Let missing-data.js work its forward-fill magic!
+  var rows = md.ffill(original_rows); 
+{% endhighlight %}
+
+Voila! No more ugly white patches. Take a minute to observe your handiwork [here](http://localhost:8000/04.html).
+
+<figure>
+  <img src="/images/cubism-intro-3.png">
+</figure>
+
+Cubism Pitfalls
+---
+The *size* variable does not depend on the size of the window but on the number of data points. As each data point is 1 pixel wide, the width of your graph is simply the number of data points you have. The number of data points determines the *size*, **not** the other way around.
+
+Afterword
+---
+This tutorial is a work in progress, and I really need your help! Let me know about errata, stuff that you'd like to see or stuff you'd like to show me in the comments below. A Graphite section is in the works, so hold tight! If you get stuck, don't hesitate to ask the wizards on [Stack Overflow](http://stackoverflow.com/questions/tagged/cubism.js).
