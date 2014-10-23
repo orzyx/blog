@@ -2,7 +2,7 @@ title:            一支葡萄藤
 description:      Describe your website here.
 disqus_shortname: orzyx
 #Comment out url when working locally to resolve base urls correctly
-url:              http://orzyx.github.io
+url:              http://orzyx.github.io/blog
 
 # Owner/author information
 owner:
@@ -35,7 +35,7 @@ pygments:    true
 markdown:    kramdown
 
 # https://github.com/mojombo/jekyll/wiki/Permalinks
-permalink:   /blog/:title
+permalink:   /:title
 
 # Amount of post to show on home page
 paginate: 5
