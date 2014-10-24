@@ -6,3 +6,4 @@ codekit-config.json
 node_modules
 push.sh
 _posts/ref
+*.bak
