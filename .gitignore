@@ -4,6 +4,5 @@ _site
 *.sublime-workspace
 codekit-config.json
 node_modules
-push.sh
+Gemfile.lock
 _posts/ref
-*.bak
